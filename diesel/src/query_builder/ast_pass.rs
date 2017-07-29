@@ -1,3 +1,5 @@
+use std::{fmt, mem};
+
 use backend::Backend;
 use query_builder::{BindCollector, QueryBuilder};
 use result::QueryResult;
@@ -39,6 +41,14 @@ impl<'a, DB> AstPass<'a, DB> where
         }
     }
 
+    pub fn debug_binds(
+        formatter: &'a mut fmt::DebugList<'a, 'a>,
+    ) -> Self {
+        AstPass {
+            internals: AstPassInternals::DebugBinds(formatter),
+        }
+    }
+
     /// Effectively copies `self`, with a narrower lifetime. This method
     /// matches the semantics of the implicit reborrow that occurs when passing
     /// a reference by value in Rust.
@@ -53,6 +63,11 @@ impl<'a, DB> AstPass<'a, DB> where
                 }
             }
             IsSafeToCachePrepared(ref mut result) => IsSafeToCachePrepared(&mut **result),
+            DebugBinds(ref mut f) => {
+                // Safe because the lifetime is always being shortened.
+                let f_with_shorter_lifetime = unsafe { mem::transmute(&mut **f) };
+                DebugBinds(f_with_shorter_lifetime)
+            }
         };
         AstPass { internals }
     }
@@ -85,6 +100,9 @@ impl<'a, DB> AstPass<'a, DB> where
             ToSql(ref mut out) => out.push_bind_param(),
             CollectBinds { ref mut collector, metadata_lookup } =>
                 collector.push_bound_value(bind, metadata_lookup)?,
+            DebugBinds(ref mut f) => {
+                f.entry(bind);
+            }
             _ => {}, // noop
         }
         Ok(())
@@ -104,8 +122,10 @@ impl<'a, DB> AstPass<'a, DB> where
         DB: HasSqlType<T>,
         U: ToSql<T, DB>,
     {
-        if let AstPassInternals::CollectBinds { .. } = self.internals {
-            self.push_bind_param(bind)?;
+        use self::AstPassInternals::*;
+        match self.internals {
+            CollectBinds { .. } | DebugBinds(..) => self.push_bind_param(bind)?,
+            _ => {}
         }
         Ok(())
     }
@@ -128,4 +148,5 @@ enum AstPassInternals<'a, DB> where
         metadata_lookup: &'a DB::MetadataLookup,
     },
     IsSafeToCachePrepared(&'a mut bool),
+    DebugBinds(&'a mut fmt::DebugList<'a, 'a>),
 }
