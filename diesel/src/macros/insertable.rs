@@ -497,8 +497,7 @@ mod tests {
                 conn
             }
         } else {
-            // FIXME: https://github.com/rust-lang/rfcs/pull/1695
-            // compile_error!("At least one backend must be enabled to run tests");
+            compile_error!("At least one backend must be enabled to run tests");
         }
     }
 }

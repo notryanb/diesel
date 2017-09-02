@@ -405,7 +405,7 @@ macro_rules! __diesel_table_impl {
     ) => {
         // Remove this workaround as soon as rust issue 40872 is implemented
         // https://github.com/rust-lang/rust/issues/40872
-        const ERROR: i32 = env!("invalid table! syntax");
+        compile_error!("invalid table! syntax");
     };
 
     // Put a parse annotation and empty fields for imports and documentation on top
@@ -1092,7 +1092,7 @@ mod tests {
             my_type -> MyCustomType,
         }
     }
-
+    
     table! {
         use types::*;
         use macros::tests::my_types::*;

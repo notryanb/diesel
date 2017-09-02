@@ -4,6 +4,9 @@ use self::diesel::*;
 use self::dotenv::dotenv;
 use std::{io, env};
 
+#[cfg(not(any(feature = "mysql", feature = "sqlite", feature = "postgres")))]
+compile_error!("Database backend must be specified");
+
 #[cfg(feature = "postgres")]
 fn connection() -> PgConnection {
     let database_url = database_url_from_env("PG_DATABASE_URL");

@@ -42,11 +42,11 @@ pub(crate) fn establish_connection(database_url: &str) -> Result<InferConnection
         #[cfg(feature = "postgres")]
         _ if database_url.starts_with("postgres://") || database_url.starts_with("postgresql://") => {
             establish_real_connection(database_url).map(InferConnection::Pg)
-        }
+        },
         #[cfg(feature = "mysql")]
         _ if database_url.starts_with("mysql://") => {
             establish_real_connection(database_url).map(InferConnection::Mysql)
-        }
+        },
         #[cfg(feature = "sqlite")]
         _ => establish_real_connection(database_url).map(InferConnection::Sqlite),
         #[cfg(all(feature = "postgres", not(feature = "sqlite")))]
@@ -56,7 +56,7 @@ pub(crate) fn establish_connection(database_url: &str) -> Result<InferConnection
                 It must start with postgres:// or postgresql://",
                 database_url,
             ).into())
-        }
+        },
         #[cfg(all(feature = "mysql", not(any(feature = "sqlite", feature = "postgres"))))]
         _ => {
             Err(format!(
@@ -64,7 +64,9 @@ pub(crate) fn establish_connection(database_url: &str) -> Result<InferConnection
                 It must start with mysql://",
                 database_url,
             ).into())
-        }
+        },
+        #[cfg(not(any(feature = "mysql", feature = "sqlite", feature = "postgres")))]
+        _ => compile_error!("No database backend specified.")
     }
 }
 
