@@ -94,8 +94,11 @@ impl<ST, T> SqlLiteral<ST, T> {
     /// assert_eq!(Ok(expected), query);
     /// # }
     /// ```
-    pub fn bind<BindST, U>(self, bind_value: U) -> UncheckedBind<Self, U, BindST> {
-        UncheckedBind::new(self, bind_value)
+    pub fn bind<BindST, U>(self, bind_value: U) -> UncheckedBind<Self, U::Expression>
+    where
+        U: AsExpression<BindST>,
+    {
+        UncheckedBind::new(self, bind_value.as_expression())
     }
 
     pub fn sql(self, sql: &str) -> SqlLiteral<ST, Self> {
@@ -179,13 +182,12 @@ pub fn sql<ST>(sql: &str) -> SqlLiteral<ST> {
 
 #[derive(Debug, Clone, Copy)]
 #[must_use = "Queries are only executed when calling `load`, `get_result`, or similar."]
-pub struct UncheckedBind<Query, Value, ST> {
+pub struct UncheckedBind<Query, Value> {
     query: Query,
     value: Value,
-    _marker: PhantomData<ST>,
 }
 
-impl<Query, Value, ST> UncheckedBind<Query, Value, ST>
+impl<Query, Value> UncheckedBind<Query, Value>
 where
     Query: Expression,
 {
@@ -193,7 +195,6 @@ where
         UncheckedBind {
             query,
             value,
-            _marker: PhantomData,
         }
     }
 
@@ -201,30 +202,40 @@ where
         SqlLiteral::new(sql.into(), self)
     }
 
-    pub fn bind<ST2, U>(self, value: U) -> UncheckedBind<Self, U, ST2> {
-        UncheckedBind::new(self, value)
+    pub fn bind<ST2, U>(self, value: U) -> UncheckedBind<Self, U::Expression>
+    where
+        U: AsExpression<ST2>,
+    {
+        UncheckedBind::new(self, value.as_expression())
     }
 }
 
-impl<Query, Value, ST> Expression for UncheckedBind<Query, Value, ST> {
-    type SqlType = ST;
+// impl<Query, Value> AsExpression<Value> for UncheckedBind<Query, Value> {
+//     type Expression = UncheckedBind<Query, Value>;
+    
+//     fn as_expression(self) -> Self::Expression {
+//         UncheckedBind::new(self)
+//     }
+// }
+
+impl<Query, Value> Expression for UncheckedBind<Query, Value> {
+    type SqlType = Value;
 }
 
-impl<Query, Value, ST> QueryId for UncheckedBind<Query, Value, ST>
+impl<Query, Value> QueryId for UncheckedBind<Query, Value>
 where
     Query: QueryId,
-    ST: QueryId,
 {
-    type QueryId = UncheckedBind<Query::QueryId, (), ST::QueryId>;
+    type QueryId = UncheckedBind<Query::QueryId, ()>;
 
-    const HAS_STATIC_QUERY_ID: bool = Query::HAS_STATIC_QUERY_ID && ST::HAS_STATIC_QUERY_ID;
+    const HAS_STATIC_QUERY_ID: bool = Query::HAS_STATIC_QUERY_ID;
 }
 
-impl<Query, Value, ST, DB> QueryFragment<DB> for UncheckedBind<Query, Value, ST>
+impl<Query, Value, DB> QueryFragment<DB> for UncheckedBind<Query, Value>
 where
-    DB: Backend + HasSqlType<ST>,
+    DB: Backend + HasSqlType<Value>,
     Query: QueryFragment<DB>,
-    Value: ToSql<ST, DB>,
+    Value: ToSql<Value, DB>,
 {
     fn walk_ast(&self, mut out: AstPass<DB>) -> QueryResult<()> {
         self.query.walk_ast(out.reborrow())?;
@@ -233,11 +244,24 @@ where
     }
 }
 
-impl<Q, Value, ST> Query for UncheckedBind<Q, Value, ST>
+// impl<ST, T, DB> QueryFragment<DB> for SqlLiteral<ST, T>
+// where
+//     DB: Backend,
+//     T: QueryFragment<DB>,
+// {
+//     fn walk_ast(&self, mut out: AstPass<DB>) -> QueryResult<()> {
+//         out.unsafe_to_cache_prepared();
+//         self.inner.walk_ast(out.reborrow())?;
+//         out.push_sql(&self.sql);
+//         Ok(())
+//     }
+// }
+
+impl<Q, Value> Query for UncheckedBind<Q, Value>
 where
     Q: Query,
 {
     type SqlType = Q::SqlType;
 }
 
-impl<Query, Value, ST, Conn> RunQueryDsl<Conn> for UncheckedBind<Query, Value, ST> {}
+impl<Query, Value, Conn> RunQueryDsl<Conn> for UncheckedBind<Query, Value> {}
