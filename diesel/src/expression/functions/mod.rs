@@ -163,6 +163,45 @@ macro_rules! __diesel_sql_function_body {
             $($rest)*
         }
     };
+    
+    // Searching for `#[sql_name]`, found it.
+    (
+        unchecked_meta = (#[sql_name] $($unchecked:tt)*),
+        meta = ($($meta:tt)*),
+        $($rest:tt)*
+    ) => {
+        __diesel_sql_function_body! {
+            sql_name = yes,
+            meta = ($($meta)* $($unchecked)*),
+            $($rest)*
+        }
+    };
+
+    // Searching for `#[sql_name]`. Didn't find it.
+    (
+        unchecked_meta = (#$checked:tt $($unchecked:tt)*),
+        meta = ($($meta:tt)*),
+        $($rest:tt)*
+    ) => {
+        __diesel_sql_function_body! {
+            unchecked_meta = ($($unchecked)*),
+            meta = ($($meta)* #$checked),
+            $($rest)*
+        }
+    };
+
+    // Done searching for `#[sql_name]`.
+    (
+        unchecked_meta = (),
+        meta = $meta:tt,
+        $($rest:tt)*
+    ) => {
+        __diesel_sql_function_body! {
+            sql_name = no,
+            meta = $meta,
+            $($rest)*
+        }
+    };
 
     (
         aggregate = $aggregate:tt,
@@ -461,6 +500,11 @@ macro_rules! __diesel_sqlite_register_fn {
 /// sql_function! {
 ///     #[aggregate]
 ///     fn sum<ST: Foldable>(expr: ST) -> ST::Sum;
+/// }
+///
+/// sql_function! {
+///     #[sql_name="mleast"]
+///     fn mleast<ST: Foldable>(expr: ST) -> ST::Mleast;
 /// }
 ///
 /// # fn main() {
