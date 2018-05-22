@@ -125,6 +125,19 @@ macro_rules! __diesel_sql_function_body {
         }
     };
 
+    // Searching for `#[sql_name]`, found it.
+    (
+        unchecked_meta = (#[sql_name=$fn_sql_name:expr] $($unchecked:tt)*),
+        meta = ($($meta:tt)*),
+        $($rest:tt)*
+    ) => {
+        __diesel_sql_function_body! {
+            unchecked_meta = ($($unchecked)*),
+            meta = ($($meta)* $($unchecked)*),
+            $($rest)*
+        }
+    };
+
     // Searching for `#[aggregate]`, found it.
     (
         unchecked_meta = (#[aggregate] $($unchecked:tt)*),
@@ -150,7 +163,7 @@ macro_rules! __diesel_sql_function_body {
             $($rest)*
         }
     };
-
+    
     // Done searching for `#[aggregate]`.
     (
         unchecked_meta = (),
@@ -163,46 +176,9 @@ macro_rules! __diesel_sql_function_body {
             $($rest)*
         }
     };
+
+    // sql_name =#[sql_name=$fn_sql_name:expr] $($rest:tt)+,
     
-    // Searching for `#[sql_name]`, found it.
-    (
-        unchecked_meta = (#[sql_name] $($unchecked:tt)*),
-        meta = ($($meta:tt)*),
-        $($rest:tt)*
-    ) => {
-        __diesel_sql_function_body! {
-            sql_name = yes,
-            meta = ($($meta)* $($unchecked)*),
-            $($rest)*
-        }
-    };
-
-    // Searching for `#[sql_name]`. Didn't find it.
-    (
-        unchecked_meta = (#$checked:tt $($unchecked:tt)*),
-        meta = ($($meta:tt)*),
-        $($rest:tt)*
-    ) => {
-        __diesel_sql_function_body! {
-            unchecked_meta = ($($unchecked)*),
-            meta = ($($meta)* #$checked),
-            $($rest)*
-        }
-    };
-
-    // Done searching for `#[sql_name]`.
-    (
-        unchecked_meta = (),
-        meta = $meta:tt,
-        $($rest:tt)*
-    ) => {
-        __diesel_sql_function_body! {
-            sql_name = no,
-            meta = $meta,
-            $($rest)*
-        }
-    };
-
     (
         aggregate = $aggregate:tt,
         meta = ($($meta:tt)*),
@@ -504,7 +480,7 @@ macro_rules! __diesel_sqlite_register_fn {
 ///
 /// sql_function! {
 ///     #[sql_name="mleast"]
-///     fn mleast<ST: Foldable>(expr: ST) -> ST::Mleast;
+///     fn mleast<ST: Foldable>(expr: ST) -> ST::Sum;
 /// }
 ///
 /// # fn main() {
